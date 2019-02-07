@@ -11,4 +11,6 @@ trait Packet {
   override def toString: String = toByteString.toByteBuffer.array().map(x => s"0x${(x & 0xFF).toHexString}").mkString(" ")
 
   def toByteString: ByteString
+
+  def toBytes: Array[Byte] = toByteString.toByteBuffer.array()
 }

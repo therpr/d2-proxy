@@ -6,6 +6,7 @@ import akka.io.Tcp.{Connect, Write}
 import akka.io.{IO, Tcp}
 import d2.GameClientProxy.GameClientClosed
 import d2.ProxySupervisor.GameServer2Client
+import d2.compression.Decompression
 import d2.packets.game.server.GameServerPacketBuilder
 import d2.packets.{Packet, PacketBuilder}
 
@@ -21,7 +22,7 @@ class GameServerProxy(remoteAddr: InetSocketAddress, supervisor: ActorRef) exten
 
   connecting = true
   info(s"connecting to $remoteAddr")
-  IO(Tcp) ! Connect(remoteAddr, Some(new InetSocketAddress("192.168.1.4", 4001)))
+  IO(Tcp) ! Connect(remoteAddr, Some(new InetSocketAddress(Config.LOCAL_IP, 4001)))
 
   override def onReceivedData(data: Packet, sender: ActorRef): Unit =  data match {
     case packet if packet.id == 0xAF =>
@@ -29,7 +30,7 @@ class GameServerProxy(remoteAddr: InetSocketAddress, supervisor: ActorRef) exten
 
       supervisor ! GameServer2Client(packet)
     case packet =>
-      info(s"received packet from server ${packet.hexId} - ${packet.size}")
+      info(s"received packet (clump) from server ${packet.hexId} - size: ${packet.size} decompressed size: ${Decompression.getPacketSize(packet.toBytes)}")
 
       supervisor ! GameServer2Client(packet)
   }

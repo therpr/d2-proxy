@@ -23,10 +23,10 @@ class BattleNetServerProxy(supervisor: ActorRef) extends TcpProxyActor {
 
   override def onReceivedData(data: Packet, sender: ActorRef): Unit = data match {
     case packet: RealmLogonPacket =>
-      val patched = packet.patch("127.0.0.1", 6666)
+      val patched = packet.patch(Config.LOCAL_IP, 6666)
       info(s"patched realm logon from ${packet.ip}:${packet.port} to ${patched.ip}:${patched.port}")
 
-      supervisor ! StartRealmClientProxy(new InetSocketAddress("127.0.0.1", 6666))
+      supervisor ! StartRealmClientProxy(new InetSocketAddress(Config.LOCAL_IP, 6666))
       supervisor ! BattleNetServer2Client(packet)
     case packet =>
       info(s"received from server: $packet")
@@ -36,18 +36,17 @@ class BattleNetServerProxy(supervisor: ActorRef) extends TcpProxyActor {
 
   override def onReceivedDataInternal(data: Packet, sender: ActorRef): Unit = data match {
     case packet: McpStartupPacket =>
-      info(s"client requested mcp startup") // run server
+      info(s"client requested mcp startup")
 
       if (remote == null) {
         onConnectionRegistered.enqueue(packet)
-        IO(Tcp) ! Connect(new InetSocketAddress(Config.BATTLE_NET_GATEWAY, 6112))
+        IO(Tcp) ! Connect(new InetSocketAddress(Config.SERVER_IP, 6112))
 
         return
       }
 
       remote ! Write(packet.toByteString)
     case packet =>
-//      info(s"client sent unknown packet ${packet.hexId}")
       remote ! Write(packet.toByteString)
   }
 }

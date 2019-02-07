@@ -11,6 +11,7 @@ import grizzled.slf4j.Logging
 import scala.collection.mutable
 
 trait TcpProxyActor extends Actor with Logging {
+
   import context._
 
   val packetBuilder: PacketBuilder
@@ -20,7 +21,7 @@ trait TcpProxyActor extends Actor with Logging {
   private var socket: ActorRef = null
   protected val keepAlive = false
   protected var connecting = false
-  protected var closed = false
+  protected var receivedPackets = 0
 
   override def receive = {
     case b@Bound(localAddress) =>
@@ -38,16 +39,12 @@ trait TcpProxyActor extends Actor with Logging {
       onConnectionRegistered.foreach(packet => sender() ! Write(packet.toByteString))
       connecting = false
     case PeerClosed =>
-      closed = true // info for all loops
-
-      if(remote == null) {
+      if (remote == null) {
         context stop self
-      } else if(!keepAlive)  {
+      } else if (!keepAlive) {
         info("peer closed")
-        if(socket == null)
-          remote ! Abort // Client
-        else
-          socket ! Unbind // Server
+
+        if (socket == null) remote ! Abort else socket ! Unbind
       } else {
         info("peer closed but keepAlive is true")
       }
@@ -55,7 +52,14 @@ trait TcpProxyActor extends Actor with Logging {
       context stop self
     case Aborted =>
       context stop self
-    case Received(data) => onReceivedData(packetBuilder(data), sender())
+    case Received(data) =>
+      receivedPackets += 1
+      packetBuilder(data, receivedPackets) match {
+        case Some(packet) =>
+          onReceivedData(packet, sender())
+        case None =>
+          info("packet was split, waiting for next chunk")
+      }
     case data: Packet => onReceivedDataInternal(data, sender())
   }
 

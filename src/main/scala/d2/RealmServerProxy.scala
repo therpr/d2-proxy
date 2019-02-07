@@ -23,10 +23,10 @@ class RealmServerProxy(supervisor: ActorRef) extends TcpProxyActor {
     case packet: GameServerLogonResponsePacket =>
       packet.result match {
         case packet.RESULT_SUCCESS =>
-          val patched = packet.patch("127.0.0.1")
+          val patched = packet.patch(Config.LOCAL_IP)
           info(s"patched game logon packet from ${packet.ip} to ${patched.ip}")
 
-          supervisor ! StartGameClientProxy(new InetSocketAddress("127.0.0.1", 4000), new InetSocketAddress(packet.ip, 4000))
+          supervisor ! StartGameClientProxy(new InetSocketAddress(Config.LOCAL_IP, 4000), new InetSocketAddress(packet.ip, 4000))
           supervisor ! RealmServer2Client(packet)
         case status =>
           info(s"game logon status failed id: $status")
@@ -39,7 +39,7 @@ class RealmServerProxy(supervisor: ActorRef) extends TcpProxyActor {
   override def onReceivedDataInternal(data: Packet, sender: ActorRef): Unit = {
     if(remote == null) {
       onConnectionRegistered.enqueue(data)
-      IO(Tcp) ! Connect(new InetSocketAddress(Config.BATTLE_NET_GATEWAY, 6113))
+      IO(Tcp) ! Connect(new InetSocketAddress(Config.SERVER_IP, 6113))
 
       return
     }
